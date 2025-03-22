@@ -1,4 +1,3 @@
-// App.js
 import React, { useState } from "react";
 
 function App() {
@@ -29,43 +28,58 @@ function App() {
   };
 
   return (
-    <div style={{ padding: "2rem" }}>
-      <h2>Загрузка видео/аудиофайла для транскрипции</h2>
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label>Выберите файл: </label>
-          <input
-            type="file"
-            accept="audio/*,video/*"
-            onChange={(e) => setFile(e.target.files[0])}
-          />
-        </div>
-        <div>
-          <label>
-            <input
-              type="checkbox"
-              checked={withTimestamps}
-              onChange={(e) => setWithTimestamps(e.target.checked)}
-            />
-            Добавить временные метки
-          </label>
-        </div>
-        <div>
-          <label>
-            <input
-              type="checkbox"
-              checked={withDiarization}
-              onChange={(e) => setWithDiarization(e.target.checked)}
-            />
-            Применить диаризацию (идентификация говорящих)
-          </label>
-        </div>
-        <button type="submit">Запустить транскрипцию</button>
-      </form>
+    <div className="main-container">
+      <h1 className="title">Аудио Транскрипция</h1>
+      <div className="form-wrapper">
+        <form onSubmit={handleSubmit} className="upload-form">
+          <div className="form-group">
+            <label className="file-label">
+              <input
+                type="file"
+                accept="audio/*,video/*"
+                onChange={(e) => setFile(e.target.files[0])}
+                className="file-input"
+              />
+              <span className="custom-file-upload">
+                Выберите аудио/видео файл
+              </span>
+            </label>
+          </div>
+
+          <div className="checkbox-group">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={withTimestamps}
+                onChange={(e) => setWithTimestamps(e.target.checked)}
+                className="checkbox-input"
+              />
+              <span className="checkmark"></span>
+              Временные метки
+            </label>
+
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={withDiarization}
+                onChange={(e) => setWithDiarization(e.target.checked)}
+                className="checkbox-input"
+              />
+              <span className="checkmark"></span>
+              Идентификация говорящих
+            </label>
+          </div>
+
+          <button type="submit" className="submit-btn">
+            Начать транскрипцию
+          </button>
+        </form>
+      </div>
+
       {result && (
-        <div style={{ marginTop: "2rem" }}>
-          <h3>Результат транскрипции:</h3>
-          <pre>{result}</pre>
+        <div className="result-container">
+          <h2 className="result-title">Результат транскрипции:</h2>
+          <pre className="result-content">{result}</pre>
         </div>
       )}
     </div>
