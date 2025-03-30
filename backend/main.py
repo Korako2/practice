@@ -1,11 +1,19 @@
 from flask import Flask, request, jsonify
 import os
 import uuid
+import time
+import torch
+import whisperx
 from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
 
+# Определяем устройство: GPU (если доступно) или CPU
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+# Загружаем модель Whisper (выбирайте размер модели: tiny, base, small, medium, large)
+model = whisperx.load_model("medium", device, compute_type="float32")
 
 # Папка для временного хранения загруженных файлов
 UPLOAD_FOLDER = "./uploads"
@@ -13,22 +21,30 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def transcribe_audio(file_path, with_timestamps=False, with_diarization=False):
     """
-    Здесь должна быть реализация транскрипции.
-    Например, можно использовать модель Whisper, Google Speech API или другое решение.
-    В данном примере возвращается тестовый результат.
+    Выполняет транскрипцию аудиофайла с использованием модели WhisperX.
     """
-    # Пример: базовая транскрипция
-    result_text = "Пример распознанного текста без дополнительных данных."
+    start_time = time.time()
+    # Расшифровка аудио с указанием языка "ru"
+    result = model.transcribe(file_path, language="ru")
+    end_time = time.time()
+    elapsed_time = end_time - start_time
 
-    # Если запрошены временные метки
+    # Объединяем текст из всех сегментов
+    full_text = " ".join(segment["text"] for segment in result["segments"])
+    transcription = f"Полный текст:\n{full_text}\n\nВремя транскрипции: {elapsed_time:.2f} секунд"
+
+    # Если запрошены временные метки, добавляем их
     if with_timestamps:
-        result_text += "\n[00:00:01] Пример фразы 1.\n[00:00:05] Пример фразы 2."
+        timestamps_text = ""
+        for segment in result["segments"]:
+            timestamps_text += f"[{segment['start']:.2f}] {segment['text']}\n"
+        transcription += "\nВременные метки:\n" + timestamps_text
 
-    # Если запрошена диаризация
+    # Если запрошена диаризация, выводим сообщение о том, что функция не реализована
     if with_diarization:
-        result_text += "\n-- Говорящий 1: Пример фразы.\n-- Говорящий 2: Другой пример."
+        transcription += "\n-- Функция диаризации не реализована в данном примере."
 
-    return result_text
+    return transcription
 
 @app.route("/api/transcribe", methods=["POST"])
 def transcribe():

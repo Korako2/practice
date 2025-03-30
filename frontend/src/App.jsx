@@ -44,6 +44,11 @@ function App() {
                 Выберите аудио/видео файл
               </span>
             </label>
+            {file && (
+              <div className="file-info">
+                Файл выбран: <strong>{file.name}</strong>
+              </div>
+            )}
           </div>
 
           <div className="checkbox-group">
