@@ -13,7 +13,7 @@ CORS(app)
 # Определяем устройство: GPU (если доступно) или CPU
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-# Загружаем модель Whisper (tiny, base, small, medium, large)
+# Загружаем модель WhisperX (варианты: tiny, base, small, medium, large)
 model = whisperx.load_model("medium", device, compute_type="float32")
 
 # Папка для временного хранения загруженных файлов
@@ -21,43 +21,75 @@ UPLOAD_FOLDER = "./uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
-def merge_intervals(segments, gap_threshold=1.0):
+def split_segment_by_diarization(seg, diarization_intervals):
     """
-    Объединяет соседние интервалы, если они принадлежат одному спикеру
-    и разрыв между ними меньше gap_threshold (в секундах).
-    Каждый сегмент — словарь с ключами: 'start', 'end', 'speaker', 'text'.
+    Разбивает транскрибированный сегмент по говорящим, основываясь на пересечении с диаризацией.
+    Назначает сегменту спикера с наибольшим пересечением (чтобы избежать дублирования).
+    """
+    seg_start = seg.get("start", 0)
+    seg_end = seg.get("end", seg_start + 1.0)
+
+    best_match = None
+    max_overlap = 0
+
+    for d in diarization_intervals:
+        # Вычисляем пересечение сегмента и интервала спикера
+        overlap_start = max(seg_start, d["start"])
+        overlap_end = min(seg_end, d["end"])
+        overlap = max(0, overlap_end - overlap_start)
+
+        if overlap > max_overlap:
+            max_overlap = overlap
+            best_match = d["speaker"]
+
+    # Если совпадений нет, оставляем "UNKNOWN"
+    speaker = best_match if best_match else "UNKNOWN"
+
+    return [{
+        "start": seg_start,
+        "end": seg_end,
+        "speaker": speaker,
+        "text": seg["text"]
+    }]
+
+
+def merge_intervals(segments, gap_threshold=0.5):
+    """
+    Объединяет подряд идущие сегменты с одним спикером, но:
+    - Исключает дублирование текстов
+    - Корректно объединяет близко расположенные сегменты
     """
     if not segments:
         return []
 
     merged = [segments[0]]
+
     for seg in segments[1:]:
         last = merged[-1]
-        # Если тот же спикер и разрыв между последним окончанием и текущим началом меньше порога
+
         if seg["speaker"] == last["speaker"] and (seg["start"] - last["end"] <= gap_threshold):
-            # Обновляем конец последнего сегмента
-            last["end"] = seg["end"]
-            # Если в текущем сегменте есть текст, добавляем его через пробел
-            if seg["text"]:
-                # Добавляем разделитель, если последний сегмент уже не заканчивается на пробел
+            # Избегаем дублирования текста при слиянии
+            if seg["text"] not in last["text"]:
                 if last["text"] and not last["text"].endswith(" "):
                     last["text"] += " "
                 last["text"] += seg["text"]
+            last["end"] = seg["end"]
         else:
             merged.append(seg)
+
     return merged
+
 
 
 def transcribe_audio(file_path, with_timestamps=False, with_diarization=False):
     """
     Выполняет транскрипцию аудиофайла с использованием модели WhisperX.
-    Если запрошена идентификация говорящих, для каждого транскрибированного сегмента определяется
-    спикер, исходя из того, в какой интервал из pyannote попадает середина сегмента.
-    Затем соседние сегменты с одинаковым спикером объединяются.
+    Если запрошена идентификация говорящих, то для каждого сегмента производится разбиение по
+    пересечениям с диаризационными интервалами, а затем объединяются соседние сегменты одного спикера.
     """
     start_time = time.time()
-    # Расшифровка аудио (язык "ru")
-    result = model.transcribe(file_path, language="ru")
+    # Транскрибируем аудио, устанавливая параметр chunk_size для получения более коротких сегментов
+    result = model.transcribe(file_path, language="ru", chunk_size=10)
     end_time = time.time()
     elapsed_time = end_time - start_time
 
@@ -72,14 +104,11 @@ def transcribe_audio(file_path, with_timestamps=False, with_diarization=False):
             timestamps_text += f"[{segment['start']:.2f}] {segment['text']}\n"
         transcription += "\nВременные метки:\n" + timestamps_text
 
-    # Если запрошена идентификация говорящих, назначаем спикера каждому сегменту
+    # Если запрошена идентификация говорящих, выполняем диаризацию и более точное разделение сегментов
     if with_diarization:
         try:
             hf_token = "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"  # Ваш токен доступа Hugging Face
-            pipeline = Pipeline.from_pretrained(
-                "pyannote/speaker-diarization-3.1",
-                use_auth_token=hf_token
-            )
+            pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1", use_auth_token=hf_token)
             diarization = pipeline(file_path)
 
             # Преобразуем результат диаризации в список интервалов
@@ -90,51 +119,18 @@ def transcribe_audio(file_path, with_timestamps=False, with_diarization=False):
                     "end": turn.end,
                     "speaker": speaker
                 })
+            # Разбиваем каждый транскрибированный сегмент по пересечениям с диаризационными интервалами
+            split_segments = []
+            for seg in result["segments"]:
+                split_segments.extend(split_segment_by_diarization(seg, diarization_intervals))
 
-            # Функция для поиска спикера по моменту времени (используем середину сегмента)
-            def find_speaker(mid_time):
-                for interval in diarization_intervals:
-                    if interval["start"] <= mid_time < interval["end"]:
-                        return interval["speaker"]
-                return "UNKNOWN"
+            # Объединяем подряд идущие сегменты с одинаковым спикером
+            grouped_segments = merge_intervals(sorted(split_segments, key=lambda s: s["start"]), gap_threshold=0.5)
 
-            # Назначаем каждому транскрибированному сегменту спикера.
-            # Если для сегмента нет точного конца, определим его как начало следующего или +1 сек.
-            assigned_segments = []
-            segments = result["segments"]
-            for i, seg in enumerate(segments):
-                seg_start = seg.get("start", 0)
-                if "end" in seg:
-                    seg_end = seg["end"]
-                else:
-                    seg_end = segments[i + 1]["start"] if i + 1 < len(segments) else seg_start + 1.0
-                mid_time = (seg_start + seg_end) / 2
-                speaker = find_speaker(mid_time)
-                assigned_segments.append({
-                    "start": seg_start,
-                    "end": seg_end,
-                    "speaker": speaker,
-                    "text": seg["text"].strip()
-                })
-
-            # Группируем подряд идущие сегменты с одинаковым спикером
-            grouped_segments = []
-            if assigned_segments:
-                current = assigned_segments[0].copy()
-                for seg in assigned_segments[1:]:
-                    # Если спикер тот же и разрыв между сегментами небольшой (например, <= 0.5 сек), объединяем
-                    if seg["speaker"] == current["speaker"] and seg["start"] - current["end"] <= 0.5:
-                        current["end"] = seg["end"]
-                        current["text"] += " " + seg["text"]
-                    else:
-                        grouped_segments.append(current)
-                        current = seg.copy()
-                grouped_segments.append(current)
-
-            # Формируем итоговый текст с указанием интервалов и соответствующего текста
+            # Формируем итоговый текст с указанием временных интервалов и спикера
             speaker_text = ""
             for seg in grouped_segments:
-                speaker_text += f"[{seg['start']:.2f}-{seg['end']:.2f}] {seg['speaker']} {seg['text']}\n"
+                speaker_text += f"[{seg['start']:.2f}-{seg['end']:.2f}] {seg['speaker']}: {seg['text']}\n"
 
             transcription += "\nИдентификация говорящих с текстом:\n" + speaker_text
         except Exception as e:

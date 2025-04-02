@@ -1,42 +1,227 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Контейнер приложения */
+.main-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
   padding: 2rem;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* Заголовок приложения */
+.title {
+  font-size: 2.5rem;
+  margin-bottom: 2rem;
+  color: #000000 !important; /* Принудительно задаём чёрный цвет */
   text-align: center;
+  text-shadow: none; /* Убираем теневой эффект, чтобы текст был чистым */
+  transition: color 0.3s;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+/* Обёртка формы */
+.form-wrapper {
+  width: 100%;
+  background: linear-gradient(145deg, #2c2c2c, #1f1f1f);
+  border-radius: 15px;
+  padding: 2rem;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+  border: 2px solid #3a3a3a;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
+/* Стили формы */
+.upload-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.file-label {
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.file-label:hover {
+  transform: translateY(-2px);
+}
+
+.custom-file-upload {
+  display: inline-block;
+  padding: 1.2rem 2.5rem;
+  background: #646cff;
+  color: white;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 500;
+  transition: background-color 0.3s;
+}
+
+.custom-file-upload:hover {
+  background: #535bf2;
+}
+
+.file-input {
+  display: none;
+}
+
+.checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  font-size: 1.1rem;
+  cursor: pointer;
+  position: relative;
+  padding-left: 35px;
+  user-select: none;
+}
+
+.checkbox-input {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 0;
+  width: 0;
+}
+
+.checkmark {
+  position: absolute;
+  left: 0;
+  height: 25px;
+  width: 25px;
+  background-color: #3a3a3a;
+  border-radius: 6px;
+  transition: all 0.3s;
+}
+
+.checkbox-label:hover .checkbox-input ~ .checkmark {
+  background-color: #4a4a4a;
+}
+
+.checkbox-input:checked ~ .checkmark {
+  background-color: #646cff;
+}
+
+.checkmark:after {
+  content: "";
+  position: absolute;
+  display: none;
+  left: 9px;
+  top: 5px;
+  width: 7px;
+  height: 12px;
+  border: solid white;
+  border-width: 0 3px 3px 0;
+  transform: rotate(45deg);
+}
+
+.checkbox-input:checked ~ .checkmark:after {
+  display: block;
+}
+
+.submit-btn {
+  background: #646cff;
+  color: white;
+  padding: 1.2rem 2rem;
+  font-size: 1.1rem;
+  border-radius: 8px;
+  transition: all 0.3s;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  max-width: 300px;
+  margin: 0 auto;
+}
+
+.submit-btn:hover {
+  background: #535bf2;
+  box-shadow: 0 4px 15px rgba(83, 91, 242, 0.4);
+}
+
+/* Контейнер результата */
+.result-container {
+  width: 100%;
+  margin-top: 3rem;
+  background: #1a1a1a;
+  border-radius: 12px;
+  padding: 2rem;
+  border: 2px solid #3a3a3a;
+}
+
+/* Заголовок результата */
+.result-title {
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+  color: #000000 !important; /* Чёрный цвет для результата транскрипции */
+  transition: color 0.3s;
+}
+
+/* Содержимое результата */
+.result-content {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  padding: 1.5rem;
+  background: #2a2a2a;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  line-height: 1.6;
+  border: 1px solid #3a3a3a;
+}
+
+/* Стили для светлой темы */
+@media (prefers-color-scheme: light) {
+  :root {
+    color: #213547;
+    background-color: #ffffff;
   }
-  to {
-    transform: rotate(360deg);
+  .form-wrapper,
+  .result-container {
+    background: #f8f9fa;
+    border-color: #e0e0e0;
   }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
+  .custom-file-upload,
+  .submit-btn {
+    background: #646cff;
+    color: white;
   }
-}
-
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
+  .result-content {
+    background: #ffffff;
+    border-color: #e0e0e0;
+  }
+  .checkmark {
+    background-color: #e0e0e0;
+  }
+  /* Изменения для заголовков в светлой теме */
+  .title {
+    color: #213547; /* Более тёмный для контраста с белым фоном */
+  }
+  .result-title {
+    color: #000000; /* Чёрный цвет для результата транскрипции */
+  }
 }
