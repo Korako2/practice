@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 import os
 import uuid
 import time
+import subprocess
 import torch
 import whisperx
 from flask_cors import CORS
@@ -19,6 +20,24 @@ model = whisperx.load_model("medium", device, compute_type="float32")
 # Папка для временного хранения загруженных файлов
 UPLOAD_FOLDER = "./uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+
+def convert_audio_to_wav(input_path):
+    """
+    Преобразует аудио в формат WAV с частотой 16000 Гц и одним каналом (моно)
+    с помощью ffmpeg.
+    """
+    output_path = os.path.splitext(input_path)[0] + "_converted.wav"
+    command = [
+        "ffmpeg", "-y",         # -y перезаписывает файл, если он существует
+        "-i", input_path,        # входной файл
+        "-ar", "16000",          # установка частоты дискретизации в 16000 Гц
+        "-ac", "1",              # установка одного аудио канала (моно)
+        output_path
+    ]
+    # Выполняем команду и игнорируем вывод
+    subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return output_path
 
 
 def split_segment_by_diarization(seg, diarization_intervals):
@@ -55,9 +74,8 @@ def split_segment_by_diarization(seg, diarization_intervals):
 
 def merge_intervals(segments, gap_threshold=0.5):
     """
-    Объединяет подряд идущие сегменты с одним спикером, но:
-    - Исключает дублирование текстов
-    - Корректно объединяет близко расположенные сегменты
+    Объединяет подряд идущие сегменты с одним спикером, исключая дублирование текста
+    и корректно объединяя близко расположенные сегменты.
     """
     if not segments:
         return []
@@ -78,7 +96,6 @@ def merge_intervals(segments, gap_threshold=0.5):
             merged.append(seg)
 
     return merged
-
 
 
 def transcribe_audio(file_path, with_timestamps=False, with_diarization=False):
@@ -148,20 +165,24 @@ def transcribe():
     if file.filename == "":
         return jsonify({"error": "Имя файла пустое"}), 400
 
-    # Сохраняем файл во временную папку
+    # Сохраняем исходный файл во временную папку
     filename = str(uuid.uuid4()) + "_" + file.filename
     file_path = os.path.join(UPLOAD_FOLDER, filename)
     file.save(file_path)
+
+    # Преобразуем аудио в формат WAV с 16000 Гц и моно каналом
+    converted_path = convert_audio_to_wav(file_path)
 
     # Получаем параметры из запроса (чекбоксы приходят в виде строки "true" или "false")
     with_timestamps = request.form.get("timestamps", "false").lower() == "true"
     with_diarization = request.form.get("diarization", "false").lower() == "true"
 
-    # Выполняем транскрипцию
-    transcription = transcribe_audio(file_path, with_timestamps, with_diarization)
+    # Выполняем транскрипцию, используя преобразованный файл
+    transcription = transcribe_audio(converted_path, with_timestamps, with_diarization)
 
-    # (Опционально) Удаляем временный файл после обработки
+    # Удаляем временные файлы (исходный и преобразованный)
     os.remove(file_path)
+    os.remove(converted_path)
 
     return jsonify({"result": transcription})
 
