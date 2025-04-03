@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    volumes:
+      # Монтируем локальную папку cache для сохранения кэша моделей,
+      # чтобы при перезапусках контейнера не скачивались модели заново.
+      - ./backend/cache:/app/cache
+    environment:
+      FLASK_APP: main
+      FLASK_RUN_HOST: "0.0.0.0"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
