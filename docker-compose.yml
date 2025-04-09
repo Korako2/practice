@@ -11,6 +11,8 @@ services:
       # Монтируем локальную папку cache для сохранения кэша моделей,
       # чтобы при перезапусках контейнера не скачивались модели заново.
       - ./backend/cache:/app/cache
+    env_file:
+      - .env
     environment:
       FLASK_APP: main
       FLASK_RUN_HOST: "0.0.0.0"

@@ -15,7 +15,7 @@ CORS(app)
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 # Загружаем модель WhisperX (варианты: tiny, base, small, medium, large)
-MODEL = whisperx.load_model("large-v3", DEVICE, compute_type="float32")
+MODEL = whisperx.load_model("tiny", DEVICE, compute_type="float32")
 print(f"Используемая модель WhisperX: {MODEL}")
 
 
@@ -94,7 +94,10 @@ def perform_diarization(file_path):
     Выполняет диаризацию аудио с использованием модели pyannote.
     Возвращает список интервалов с указанием говорящего.
     """
-    hf_token = "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"  # Токен доступа Hugging Face
+    hf_token = os.environ.get("HUGGINGFACE_TOKEN")
+    if not hf_token:
+        raise ValueError("Токен HUGGINGFACE_TOKEN не установлен в переменных окружения")
+
     pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1", use_auth_token=hf_token)
     diarization = pipeline(file_path)
     diarization_intervals = []
